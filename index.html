@@ -43,7 +43,12 @@
 </div>
 <script>
 // Adres tünel her yeniden başladığında buraya yazılır.
-const ADRES = "https://charts-entered-positive-represents.trycloudflare.com";
+// Sayfanin kendisi CDN'de onbelleklenip ESKI adresle servis edilebiliyor:
+// tunel her yeniden basladiginda adres degisiyor ve kullanici bayat bir
+// kopyayi aliyordu. Bu yuzden adres calisma aninda, onbellek kirici ile
+// ayrica cekiliyor; asagidaki sabit yalnizca yedek.
+const ADRES_YEDEK = "https://charts-entered-positive-represents.trycloudflare.com";
+let ADRES = ADRES_YEDEK;
 const g   = document.getElementById('git');
 const sp  = document.getElementById('sp');
 const err = document.getElementById('err');
@@ -56,10 +61,31 @@ g.href = ADRES;
 const ARA_MS = 2500, SURE_MS = 90000;
 let dene = 0, t0 = Date.now();
 
+// Taze adresi bul: once raw.githubusercontent (Pages derlemesinden bagimsiz),
+// sonra ayni site, sonunda gomulu yedek.
+async function adresTazele(){
+  const kaynaklar = [
+    'https://raw.githubusercontent.com/ekcna/tp/main/adres.txt',
+    'adres.txt',
+  ];
+  for(const u of kaynaklar){
+    try{
+      const r = await fetch(u + '?cb=' + Date.now(), {cache:'no-store'});
+      if(!r.ok) continue;
+      const t = (await r.text()).trim();
+      if(/^https:\/\/[a-z0-9.-]+$/i.test(t)){
+        if(t !== ADRES){ ADRES = t; g.href = ADRES; }
+        return;
+      }
+    }catch(e){}
+  }
+}
+
 function gec(){ location.replace(ADRES); }
 
 async function bak(){
   dene++;
+  await adresTazele();          // her denemede adresi yeniden dogrula
   try{
     await fetch(ADRES + '/health', {mode:'no-cors', cache:'no-store'});
     d.textContent = 'terminal ayakta — açılıyor…';
