@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>TradePulse</title>
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#000;color:#ffa028;min-height:100dvh;display:flex;align-items:center;
+    justify-content:center;padding:24px;
+    font:15px/1.5 -apple-system,'SF Pro Text',system-ui,sans-serif;
+    padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+  .k{width:100%;max-width:380px;text-align:center}
+  img{width:82px;height:82px;border-radius:19px;margin-bottom:18px}
+  h1{font-size:19px;letter-spacing:1.5px;font-weight:700;color:#ffc400;margin-bottom:6px}
+  .d{color:#96702a;font-size:13px;margin-bottom:24px}
+  .sp{width:26px;height:26px;border:2px solid #3a2f14;border-top-color:#ffc400;
+    border-radius:50%;animation:s .8s linear infinite;margin:0 auto 16px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  a.b{display:block;background:#0a2a6b;color:#ffc400;text-decoration:none;
+    padding:15px;border-radius:9px;font-weight:700;letter-spacing:.5px;margin-top:8px}
+  a.b:active{opacity:.75}
+  .n{color:#6b5420;font-size:11.5px;margin-top:20px;line-height:1.6}
+  .err{color:#ff6b61;font-size:13px;margin-top:14px;display:none}
+</style>
+</head>
+<body>
+<div class="k">
+  <img src="icon-192.png" alt="">
+  <h1>TRADEPULSE</h1>
+  <div class="d">terminale yönlendiriliyor…</div>
+  <div class="sp" id="sp"></div>
+  <a class="b" id="git" href="#">TERMİNALİ AÇ</a>
+  <div class="err" id="err">Terminal şu an kapalı görünüyor.<br>Mac açık ve internete bağlı olmalı.</div>
+  <div class="n">
+    Bu sayfa sadece güncel adrese yönlendirir.<br>
+    Terminal ayrıca <b>şifre</b> ister — adresi bilen içeri giremez.
+  </div>
+</div>
+<script>
+// Adres tünel her yeniden başladığında buraya yazılır.
+const ADRES = "__ADRES__";
+const g = document.getElementById('git');
+g.href = ADRES;
+g.textContent = 'TERMİNALİ AÇ';
+// Once ayakta mi diye bak, sonra yonlendir
+fetch(ADRES + '/health', {mode:'no-cors', cache:'no-store'})
+  .then(()=>{ setTimeout(()=>location.replace(ADRES), 400); })
+  .catch(()=>{ document.getElementById('sp').style.display='none';
+               document.getElementById('err').style.display='block'; });
+setTimeout(()=>{ document.getElementById('sp').style.display='none'; }, 6000);
+</script>
+</body>
+</html>
