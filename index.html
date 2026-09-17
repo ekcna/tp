@@ -44,15 +44,50 @@
 <script>
 // Adres tünel her yeniden başladığında buraya yazılır.
 const ADRES = "https://southern-warranty-cove-comments.trycloudflare.com";
-const g = document.getElementById('git');
+const g   = document.getElementById('git');
+const sp  = document.getElementById('sp');
+const err = document.getElementById('err');
+const d   = document.querySelector('.d');
 g.href = ADRES;
-g.textContent = 'TERMİNALİ AÇ';
-// Once ayakta mi diye bak, sonra yonlendir
-fetch(ADRES + '/health', {mode:'no-cors', cache:'no-store'})
-  .then(()=>{ setTimeout(()=>location.replace(ADRES), 400); })
-  .catch(()=>{ document.getElementById('sp').style.display='none';
-               document.getElementById('err').style.display='block'; });
-setTimeout(()=>{ document.getElementById('sp').style.display='none'; }, 6000);
+
+// Bot düştüğünde launchd onu ~20 saniyede geri kaldırıyor. Tek deneyip pes
+// etmek kullanıcıyı tam o pencerede duvara çarptırıyordu; artık ayağa
+// kalkana kadar bekliyoruz.
+const ARA_MS = 2500, SURE_MS = 90000;
+let dene = 0, t0 = Date.now();
+
+function gec(){ location.replace(ADRES); }
+
+async function bak(){
+  dene++;
+  try{
+    await fetch(ADRES + '/health', {mode:'no-cors', cache:'no-store'});
+    d.textContent = 'terminal ayakta — açılıyor…';
+    err.style.display = 'none';
+    setTimeout(gec, 350);
+    return;
+  }catch(e){}
+
+  const kalan = Math.max(0, Math.round((SURE_MS - (Date.now() - t0)) / 1000));
+  if(kalan === 0){
+    sp.style.display = 'none';
+    d.textContent = 'terminale ulaşılamadı';
+    err.innerHTML = 'Terminal şu an kapalı görünüyor.<br>Mac açık ve internete bağlı olmalı.' +
+      '<br><br><a href="#" id="tekrar" style="color:#ffc400">tekrar dene</a>';
+    err.style.display = 'block';
+    document.getElementById('tekrar').onclick = ev => {
+      ev.preventDefault(); dene = 0; t0 = Date.now();
+      sp.style.display = ''; err.style.display = 'none'; bak();
+    };
+    return;
+  }
+  d.textContent = 'terminal yanıt vermiyor — yeniden deneniyor (' + dene + ')';
+  err.innerHTML = 'Bot yeniden başlıyor olabilir; bu genelde 20 saniye sürer.<br>' +
+                  kalan + ' saniye daha denenecek.';
+  err.style.display = 'block';
+  setTimeout(bak, ARA_MS);
+}
+bak();
 </script>
 </body>
 </html>
