@@ -79,6 +79,19 @@
   <span class="et">bulut görünümü · salt okunur</span>
 </div>
 
+<div id="kilit" style="display:none;padding:26px 14px;max-width:420px">
+  <div style="color:var(--amb);font-size:13px;margin-bottom:6px;font-weight:700">
+    ŞİFRELİ ANLIK GÖRÜNTÜ</div>
+  <div style="color:var(--dim);font-size:11.5px;line-height:1.6;margin-bottom:14px">
+    Bu sayfa herkese açık bir adreste duruyor, bu yüzden veri şifreli saklanıyor.
+    Terminalde kullandığın <b>aynı API anahtarı</b> ile açılır.</div>
+  <input id="tokin" type="password" placeholder="API_TOKEN" autocomplete="current-password"
+    style="width:100%;background:var(--bg3);border:1px solid var(--line2);color:var(--txt);
+           font:15px var(--mono);padding:11px;min-height:44px;outline:none">
+  <button class="btn" id="ac" style="width:100%;margin-top:9px;min-height:44px">AÇ</button>
+  <div id="kilithata" style="color:var(--red);font-size:11.5px;margin-top:9px;display:none"></div>
+</div>
+
 <div id="govde"><div class="bos">yükleniyor…</div></div>
 
 <div class="not">
@@ -131,44 +144,38 @@ function egriSVG(noktalar){
 }
 
 function ciz(d){
-  const kv = d.kv || {};
-  const isl = (d.trades || []).slice().sort((a,b)=>b.ts-a.ts);
-  const eq  = (d.equity || []).slice().sort((a,b)=>a.ts-b.ts);
+  const pz  = d.piyasalar || {};
+  const isl = (d.islemler || []).slice().sort((a,b)=>b.ts-a.ts);
+  const eq  = (d.ozsermaye || []).slice().sort((a,b)=>a.ts-b.ts);
 
-  // Veri ne kadar taze
-  const enSon = Math.max(
-    ...(eq.length ? [eq[eq.length-1].ts] : [0]),
-    ...(isl.length ? [isl[0].ts] : [0]));
-  if(enSon > 0){
-    const saat = (Date.now()/1000 - enSon)/3600;
-    document.getElementById('tazelik').textContent =
-      `veri: ${tarihStr(enSon)}` + (saat>26 ? ` · ${Math.round(saat/24)} gün önce` : '');
+  if(d.uretim){
+    const saat = (Date.now()/1000 - d.uretim)/3600;
+    const yas = saat < 1 ? Math.round(saat*60)+' dk önce'
+              : saat < 26 ? Math.round(saat)+' saat önce'
+              : Math.round(saat/24)+' gün önce';
+    document.getElementById('tazelik').textContent = `veri: ${tarihStr(d.uretim)} · ${yas}`;
   }
 
   let h = '';
 
   // ── Piyasa kartları ──
   const kartlar = [];
-  for(const m of ['BIST','NASDAQ']){
-    const p = kv['tradepulse:portfolio:'+m];
-    if(!p) continue;
-    const I = ISARET[m];
-    const poz = p.positions || {};
-    // Pozisyon değeri: son bilinen fiyat yok, maliyet üzerinden gösteriyoruz
-    let maliyet = 0, adet = 0;
-    for(const s in poz){ maliyet += (poz[s].qty||0)*(poz[s].avg||0); adet++; }
-    const toplam = (p.cash||0) + maliyet;
-    const kz = toplam - (p.start||0);
-    const kzp = p.start ? kz/p.start*100 : 0;
+  for(const m in pz){
+    const p = pz[m];
+    if(p.hata){ kartlar.push(`<div class="pk"><div class="ad">${esc(m)}</div>
+      <div class="alt neg">okunamadı: ${esc(p.hata)}</div></div>`); continue; }
+    const I = p.isaret || ISARET[m] || '';
     kartlar.push(`<div class="pk">
-      <div class="ad">${BAYRAK[m]} ${m}</div>
-      <div class="bd ${sn(kz)}">${I}${nf(toplam)}</div>
-      <div class="alt ${sn(kz)}">${sgn(kz)} (${sgn(kzp,2)}%)</div>
+      <div class="ad">${p.flag||BAYRAK[m]||''} ${esc(m)}</div>
+      <div class="bd ${sn(p.kz)}">${I}${nf(p.toplam)}</div>
+      <div class="alt ${sn(p.kz)}">${sgn(p.kz)} (${sgn(p.kz_pct,2)}%)</div>
       <div style="margin-top:9px">
-        <div class="sat"><span class="k">Nakit</span><span class="v">${I}${nf(p.cash)}</span></div>
-        <div class="sat"><span class="k">Pozisyon maliyeti</span><span class="v">${I}${nf(maliyet)}</span></div>
-        <div class="sat"><span class="k">Açık pozisyon</span><span class="v">${adet}</span></div>
-        <div class="sat"><span class="k">Başlangıç</span><span class="v">${I}${nf(p.start)}</span></div>
+        <div class="sat"><span class="k">Bugün</span>
+          <span class="v ${sn(p.gunluk)}">${sgn(p.gunluk)} (${sgn(p.gunluk_pct,2)}%)</span></div>
+        <div class="sat"><span class="k">Nakit</span><span class="v">${I}${nf(p.nakit)}</span></div>
+        <div class="sat"><span class="k">Pozisyon değeri</span><span class="v">${I}${nf(p.pozisyon_degeri)}</span></div>
+        <div class="sat"><span class="k">Maruziyet</span><span class="v">%${nf(p.maruziyet_pct,1)}</span></div>
+        <div class="sat"><span class="k">Açık pozisyon</span><span class="v">${(p.pozisyonlar||[]).length}</span></div>
       </div></div>`);
   }
   h += `<div class="pzr">${kartlar.join('')}</div>`;
@@ -176,30 +183,25 @@ function ciz(d){
   // ── Özsermaye eğrisi ──
   if(eq.length > 1){
     const bist = eq.filter(x=>x.market==='BIST');
-    const kaynak = bist.length>1 ? bist : eq;
+    const kaynak = (bist.length>1 ? bist : eq).map(x=>({total:x.total}));
     h += `<h2>Özsermaye eğrisi · ${kaynak.length} nokta</h2>` + egriSVG(kaynak);
   }
 
   // ── Pozisyonlar ──
-  for(const m of ['BIST','NASDAQ']){
-    const p = kv['tradepulse:portfolio:'+m];
-    const poz = p && p.positions || {};
-    const anahtar = Object.keys(poz);
-    if(!anahtar.length) continue;
-    const I = ISARET[m];
-    h += `<h2>${BAYRAK[m]} ${m} pozisyonları · ${anahtar.length}</h2>
+  for(const m in pz){
+    const p = pz[m], liste = p.pozisyonlar || [];
+    if(!liste.length) continue;
+    const I = p.isaret || ISARET[m] || '';
+    h += `<h2>${p.flag||''} ${esc(m)} pozisyonları · ${liste.length}</h2>
       <div class="sarma"><table><thead><tr>
-        <th>Hisse</th><th>Adet</th><th>Maliyet</th><th>Stop</th><th>Hedef</th>
-        <th>Tutar</th><th>Strateji</th></tr></thead><tbody>
-      ${anahtar.map(s=>{
-        const x = poz[s];
-        return `<tr><td>${esc(s)}</td><td>${nf(x.qty)}</td>
-          <td>${I}${nf(x.avg,2)}</td>
-          <td class="neg">${x.stop?I+nf(x.stop,2):'—'}</td>
-          <td class="pos">${x.target?I+nf(x.target,2):'—'}</td>
-          <td>${I}${nf((x.qty||0)*(x.avg||0))}</td>
-          <td class="neu" style="font-size:10px">${esc(x.strategy||'')}</td></tr>`;
-      }).join('')}
+        <th>Hisse</th><th>Adet</th><th>Maliyet</th><th>Fiyat</th><th>Değer</th>
+        <th>K/Z</th><th>Stop</th><th>Strateji</th></tr></thead><tbody>
+      ${liste.map(x=>`<tr><td>${esc(x.sembol)}</td><td>${nf(x.adet)}</td>
+        <td>${I}${nf(x.maliyet,2)}</td><td>${I}${nf(x.fiyat,2)}</td>
+        <td>${I}${nf(x.deger)}</td>
+        <td class="${sn(x.kz)}">${sgn(x.kz)} <span style="font-size:10px">(${sgn(x.kz_pct,1)}%)</span></td>
+        <td class="neg">${x.stop?I+nf(x.stop,2):'—'}</td>
+        <td class="neu" style="font-size:10px">${esc(x.strateji||'')}</td></tr>`).join('')}
       </tbody></table></div>`;
   }
 
@@ -209,7 +211,7 @@ function ciz(d){
       <th>Tarih</th><th>Hisse</th><th>Yön</th><th>Adet</th><th>Fiyat</th>
       <th>Realize</th><th>Sebep</th></tr></thead><tbody>
       ${isl.slice(0,24).map(t=>{
-        const I = ISARET[t.market] || '';
+        const I = (pz[t.market]||{}).isaret || ISARET[t.market] || '';
         const al = t.side==='buy';
         return `<tr><td class="neu">${tarihStr(t.ts)}</td><td>${esc(t.symbol)}</td>
           <td class="${al?'pos':'neg'}">${al?'AL':'SAT'}</td>
@@ -221,19 +223,66 @@ function ciz(d){
   }
 
   document.getElementById('govde').innerHTML = h ||
-    '<div class="bos">Bulut durumunda henüz veri yok.</div>';
+    '<div class="bos">Anlık görüntüde veri yok.</div>';
+}
+
+/* ── Şifre çözme ─────────────────────────────────────────────────
+   Paket: PBKDF2-SHA256(tur) -> 256 bit anahtar, AES-GCM.
+   Python tarafı (bulut_anlik.py) aynı şemayı kullanıyor. */
+const b64 = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+
+async function paketCoz(paket, parola){
+  const enc = new TextEncoder();
+  const ham = await crypto.subtle.importKey('raw', enc.encode(parola),
+                {name:'PBKDF2'}, false, ['deriveKey']);
+  const anahtar = await crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt:b64(paket.tuz), iterations:paket.tur, hash:'SHA-256'},
+    ham, {name:'AES-GCM', length:256}, false, ['decrypt']);
+  const acik = await crypto.subtle.decrypt(
+    {name:'AES-GCM', iv:b64(paket.iv)}, anahtar, b64(paket.veri));
+  return JSON.parse(new TextDecoder().decode(acik));
+}
+
+let PAKET = null;
+
+async function dene(parola){
+  const hata = document.getElementById('kilithata');
+  try{
+    const veri = await paketCoz(PAKET, parola);
+    try{ localStorage.setItem('tp_token', parola); }catch(e){}
+    document.getElementById('kilit').style.display = 'none';
+    document.getElementById('govde').style.display = '';
+    ciz(veri);
+    return true;
+  }catch(e){
+    hata.textContent = 'Anahtar yanlış — çözülemedi.';
+    hata.style.display = 'block';
+    return false;
+  }
 }
 
 (async ()=>{
+  const govde = document.getElementById('govde');
   try{
-    const r = await fetch(HAM+'bulut-durum.json?cb='+Date.now(), {cache:'no-store'});
+    const r = await fetch(HAM+'durum.enc?cb='+Date.now(), {cache:'no-store'});
     if(!r.ok) throw new Error('HTTP '+r.status);
-    ciz(await r.json());
+    PAKET = await r.json();
   }catch(e){
-    document.getElementById('govde').innerHTML =
-      `<div class="bos" style="color:var(--red)">Bulut durumu okunamadı: ${esc(e.message)}
-       <br><br>Bu genelde geçicidir; birkaç dakika sonra tekrar dene.</div>`;
+    govde.innerHTML = `<div class="bos" style="color:var(--red)">
+      Anlık görüntü okunamadı: ${esc(e.message)}<br><br>
+      Mac en az bir kez açık olup anlık görüntü yayınlamış olmalı.</div>`;
+    return;
   }
+  // Kayıtlı anahtar varsa doğrudan dene
+  let kayitli = null;
+  try{ kayitli = localStorage.getItem('tp_token'); }catch(e){}
+  if(kayitli && await dene(kayitli)) return;
+  govde.style.display = 'none';
+  document.getElementById('kilit').style.display = 'block';
+  document.getElementById('ac').onclick = () => dene(document.getElementById('tokin').value);
+  document.getElementById('tokin').addEventListener('keydown', e=>{
+    if(e.key==='Enter') dene(e.target.value); });
+  document.getElementById('tokin').focus();
 })();
 
 /* Canlı terminal geri geldiyse üstte haber ver */
