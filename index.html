@@ -36,6 +36,7 @@
   <div class="sp" id="sp"></div>
   <a class="b" id="git" href="#">TERMİNALİ AÇ</a>
   <div class="err" id="err">Terminal şu an kapalı görünüyor.<br>Mac açık ve internete bağlı olmalı.</div>
+  <a class="b" href="yedek.html" style="background:#111826;color:#96702a;margin-top:10px">BULUT GÖRÜNÜMÜ (SALT OKUNUR)</a>
   <div class="n">
     Bu sayfa sadece güncel adrese yönlendirir.<br>
     Terminal ayrıca <b>şifre</b> ister — adresi bilen içeri giremez.
@@ -58,7 +59,11 @@ g.href = ADRES;
 // Bot düştüğünde launchd onu ~20 saniyede geri kaldırıyor. Tek deneyip pes
 // etmek kullanıcıyı tam o pencerede duvara çarptırıyordu; artık ayağa
 // kalkana kadar bekliyoruz.
-const ARA_MS = 2500, SURE_MS = 90000;
+// Canliyi kisa sure dene; olmazsa BULUT YEDEGINE gec.
+// Eskiden 90 saniye deneyip hata gosteriyordu: Mac uykudayken kullanici
+// bos ekrana bakiyordu. Artik hicbir zaman bos ekran gormuyor — Mac
+// ulasilamazsa bulutun son anlik goruntusu aciliyor.
+const ARA_MS = 2500, CANLI_SURE_MS = 20000;
 let dene = 0, t0 = Date.now();
 
 // Taze adresi bul: once raw.githubusercontent (Pages derlemesinden bagimsiz),
@@ -85,7 +90,7 @@ function gec(){ location.replace(ADRES); }
 
 async function bak(){
   dene++;
-  await adresTazele();          // her denemede adresi yeniden dogrula
+  await adresTazele();
   try{
     await fetch(ADRES + '/health', {mode:'no-cors', cache:'no-store'});
     d.textContent = 'terminal ayakta — açılıyor…';
@@ -94,22 +99,16 @@ async function bak(){
     return;
   }catch(e){}
 
-  const kalan = Math.max(0, Math.round((SURE_MS - (Date.now() - t0)) / 1000));
-  if(kalan === 0){
-    sp.style.display = 'none';
-    d.textContent = 'terminale ulaşılamadı';
-    err.innerHTML = 'Terminal şu an kapalı görünüyor.<br>Mac açık ve internete bağlı olmalı.' +
-      '<br><br><a href="#" id="tekrar" style="color:#ffc400">tekrar dene</a>';
-    err.style.display = 'block';
-    document.getElementById('tekrar').onclick = ev => {
-      ev.preventDefault(); dene = 0; t0 = Date.now();
-      sp.style.display = ''; err.style.display = 'none'; bak();
-    };
+  if(Date.now() - t0 >= CANLI_SURE_MS){
+    // Canli terminale ulasilamiyor: bos ekran gosterme, buluta dus.
+    d.textContent = 'Mac ulaşılamıyor — bulut görünümüne geçiliyor…';
+    location.replace('yedek.html');
     return;
   }
-  d.textContent = 'terminal yanıt vermiyor — yeniden deneniyor (' + dene + ')';
-  err.innerHTML = 'Bot yeniden başlıyor olabilir; bu genelde 20 saniye sürer.<br>' +
-                  kalan + ' saniye daha denenecek.';
+  const kalan = Math.max(0, Math.round((CANLI_SURE_MS - (Date.now() - t0)) / 1000));
+  d.textContent = 'terminal yanıt vermiyor — deneniyor (' + dene + ')';
+  err.innerHTML = 'Bot yeniden başlıyor olabilir.<br>' + kalan +
+                  ' saniye sonra bulut görünümü açılacak.';
   err.style.display = 'block';
   setTimeout(bak, ARA_MS);
 }
